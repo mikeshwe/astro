@@ -50,7 +50,6 @@ tests = [
     "snowflake-connector-python[pandas]",
     "apache-airflow-providers-postgres",
     "s3fs",
-    "smart-open[s3,gcs]>=5.2.1",
 ]
 google = [
     "apache-airflow-providers-google",
