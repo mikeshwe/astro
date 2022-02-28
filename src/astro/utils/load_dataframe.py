@@ -23,6 +23,7 @@ from pandas.io.sql import SQLDatabase
 from astro.utils.dependencies import (
     BigQueryHook,
     PostgresHook,
+    RedshiftSQLHook,
     SnowflakeHook,
     pandas_tools,
 )
@@ -51,6 +52,7 @@ def move_dataframe_to_sql(
         },
         "bigquery": {"use_legacy_sql": False, "gcp_conn_id": conn_id},
         "sqlite": {"sqlite_conn_id": conn_id},
+        "redshift": {"redshift_conn_id": conn_id},
     }
     try:
         hook_class = {
@@ -59,6 +61,7 @@ def move_dataframe_to_sql(
             "snowflake": SnowflakeHook,
             "bigquery": BigQueryHook,
             "sqlite": SqliteHook,
+            "redshift": RedshiftSQLHook,
         }[conn_type]
     except KeyError:
         raise ValueError(

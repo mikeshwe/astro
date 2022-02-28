@@ -8,7 +8,12 @@ from airflow.utils import timezone
 from airflow.utils.state import State
 from airflow.utils.types import DagRunType
 
-from astro.utils.dependencies import BigQueryHook, PostgresHook, SnowflakeHook
+from astro.utils.dependencies import (
+    BigQueryHook,
+    PostgresHook,
+    RedshiftSQLHook,
+    SnowflakeHook,
+)
 
 DEFAULT_SCHEMA = os.getenv("AIRFLOW__ASTRO__SQL_SCHEMA", "astroflow_ci")
 DEFAULT_DATE = timezone.datetime(2016, 1, 1)
@@ -25,12 +30,14 @@ SQL_SERVER_HOOK_PARAMETERS = {
         "gcp_conn_id": "bigquery",
     },
     "sqlite": {"sqlite_conn_id": "sqlite_conn"},
+    "redshift": {"redshift_conn_id": "redshift_conn"},
 }
 SQL_SERVER_CONNECTION_KEY = {
     "snowflake": "snowflake_conn_id",
     "postgres": "postgres_conn_id",
     "bigquery": "gcp_conn_id",
     "sqlite": "sqlite_conn_id",
+    "redshift": "redshift_conn_id",
 }
 
 SQL_SERVER_HOOK_CLASS = {
@@ -38,6 +45,7 @@ SQL_SERVER_HOOK_CLASS = {
     "postgres": PostgresHook,
     "bigquery": BigQueryHook,
     "sqlite": SqliteHook,
+    "redshift": RedshiftSQLHook,
 }
 
 

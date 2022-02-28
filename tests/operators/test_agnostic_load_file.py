@@ -521,7 +521,9 @@ def create_task_parameters(database_name, file_type):
 
 
 @pytest.mark.parametrize(
-    "sql_server", ["snowflake", "postgres", "bigquery", "sqlite"], indirect=True
+    "sql_server",
+    ["snowflake", "postgres", "bigquery", "sqlite", "redshift"],
+    indirect=True,
 )
 @pytest.mark.parametrize("file_type", ["parquet", "ndjson", "json", "csv"])
 def test_load_file(sample_dag, sql_server, file_type):

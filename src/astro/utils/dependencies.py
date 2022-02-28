@@ -73,3 +73,8 @@ try:
     from psycopg2 import sql as postgres_sql
 except ModuleNotFoundError:
     postgres_sql = MissingPackage("psycopg2", "postgres")
+
+try:
+    from airflow.providers.amazon.aws.hooks.redshift_sql import RedshiftSQLHook
+except ModuleNotFoundError:
+    postgres_sql = MissingPackage("apache-airflow-providers-amazon", "amazon")

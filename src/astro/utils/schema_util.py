@@ -25,7 +25,7 @@ def schema_exists(hook, schema, conn_type):
 
 def create_schema_query(conn_type, hook, schema_id, user):
 
-    if conn_type in ["postgresql", "postgres"]:
+    if conn_type in ["postgresql", "postgres", "redshift"]:
         return (
             postgres_sql.SQL(
                 "CREATE SCHEMA IF NOT EXISTS {schema} AUTHORIZATION {user}"
