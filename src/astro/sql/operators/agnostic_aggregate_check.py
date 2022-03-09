@@ -89,18 +89,19 @@ class AgnosticAggregateCheck(SqlDecoratedOperator):
         super().__init__(
             raw_sql=True,
             parameters={},
-            conn_id=table.conn_id,
             task_id=task_id,
             op_args=(),
             handler=handler_func,
             python_callable=null_function,
-            database=table.database,
             **kwargs,
         )
 
     def execute(self, context: Dict):
         self.sql = self.check
         self.parameters = {"table": self.table}
+        self.conn_id = self.table.conn_id
+        self.database = self.table.database
+
         query_result = super().execute(context)
         if not isinstance(query_result, int) and not isinstance(query_result, float):
             raise ValueError(
