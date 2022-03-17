@@ -42,6 +42,7 @@ def validate(df: pd.DataFrame):
     assert df.iloc[0].to_dict()["first_name"] == "PENELOPE"
 
 
+@pytest.mark.integration
 @pytest.mark.parametrize("output_table", ["None", "partial", "full"], indirect=True)
 def test_postgres_to_dataframe_partial_output(output_table, dag):
     @aql.transform
@@ -103,6 +104,7 @@ def pg_query_result(request):
         )
 
 
+@pytest.mark.integration
 @pytest.mark.parametrize(
     "pg_query_result",
     ["basic", "semicolon", "with_param", "with_jinja", "with_jinja_template_params"],
@@ -123,6 +125,7 @@ def test_postgres(sample_dag, pg_query_result):
     test_utils.run_dag(sample_dag)
 
 
+@pytest.mark.integration
 @pytest.mark.parametrize("sql_server", ["postgres"], indirect=True)
 def test_postgres_join(sample_dag, tmp_table, sql_server):
     @aql.transform(conn_id="postgres_conn", database="pagila")

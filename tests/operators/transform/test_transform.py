@@ -12,6 +12,7 @@ from tests.operators import utils as test_utils
 cwd = pathlib.Path(__file__).parent
 
 
+@pytest.mark.integration
 @pytest.mark.parametrize(
     "sql_server",
     [
@@ -48,6 +49,7 @@ def test_dataframe_transform(sql_server, sample_dag, tmp_table):
     test_utils.run_dag(sample_dag)
 
 
+@pytest.mark.integration
 @pytest.mark.parametrize(
     "sql_server",
     [
@@ -82,6 +84,7 @@ def test_transform(sql_server, sample_dag, tmp_table):
     test_utils.run_dag(sample_dag)
 
 
+@pytest.mark.integration
 @pytest.mark.parametrize(
     "sql_server",
     [
