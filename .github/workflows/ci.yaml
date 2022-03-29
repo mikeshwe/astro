@@ -40,13 +40,20 @@ jobs:
           architecture: 'x64'
       - uses: actions/cache@v2
         with:
-          path: ~/.cache/pip
-          key: ${{ hashFiles('pyproject.toml') }}
+          path: |
+            ~/.cache/pip
+            .nox
+          key: ${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
       - run: cat .github/ci-test-connections.yaml > test-connections.yaml
       - run: python -c 'import os; print(os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON", "").strip())' > ${{ env.GOOGLE_APPLICATION_CREDENTIALS }}
       - run: sqlite3 /tmp/sqlite_default.db "VACUUM;"
       - run: pip3 install nox
       - run: nox -s test_examples_by_dependency
+      - name: Upload coverage
+        uses: actions/upload-artifact@v2
+        with:
+          name: coverage${{ matrix.group }}
+          path: .coverage
     env:
       GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
       GOOGLE_APPLICATION_CREDENTIALS: /tmp/google_credentials.json
@@ -67,11 +74,12 @@ jobs:
       AIRFLOW__CORE__LOAD_DEFAULT_CONNECTIONS: True
       AIRFLOW__CORE__ENABLE_XCOM_PICKLING: True
       AIRFLOW_VAR_FOO: templated_file_name
+      FORCE_COLOR: "true"
   Run-Unit-tests:
     strategy:
       fail-fast: false
       matrix:
-        group: [ 1, 2, 3, 4, 5, 6, 7, 8 ]
+        group: [ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 ]
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -95,18 +103,20 @@ jobs:
           architecture: 'x64'
       - uses: actions/cache@v2
         with:
-          path: ~/.cache/pip
-          key: ${{ hashFiles('pyproject.toml') }}
+          path: |
+            ~/.cache/pip
+            .nox
+          key: ${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
       - run: cat .github/ci-test-connections.yaml > test-connections.yaml
       - run: python -c 'import os; print(os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON", "").strip())' > ${{ env.GOOGLE_APPLICATION_CREDENTIALS }}
       - run: sqlite3 /tmp/sqlite_default.db "VACUUM;"
       - run: pip3 install nox
-      - run: nox -s test -- --splits 8 --group ${{ matrix.group }} --cov=./ --cov-report=xml --cov-branch
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v1
+      - run: nox -s test -- --splits 12 --group ${{ matrix.group }}
+      - name: Upload coverage
+        uses: actions/upload-artifact@v2
         with:
-          fail_ci_if_error: true
-          token: ${{ secrets.CODECOV_TOKEN }}
+          name: coverage${{ matrix.group }}
+          path: .coverage
     env:
       AWS_BUCKET: tmp9
       GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
@@ -129,3 +139,31 @@ jobs:
       AIRFLOW__CORE__LOAD_DEFAULT_CONNECTIONS: True
       AIRFLOW__CORE__ENABLE_XCOM_PICKLING: True
       AIRFLOW_VAR_FOO: templated_file_name
+
+  Code-Coverage:
+    needs:
+      - Run-Unit-tests
+      - Run-Optional-Packages-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
+      - name: Install coverage
+        run: |
+          pip3 install coverage
+      - name: Download all artifacts
+        uses: actions/download-artifact@v2
+      - name: Run coverage
+        run: |
+          coverage combine coverage*/.coverage*
+          coverage report
+          coverage xml
+      - name: Upload coverage
+        uses: codecov/codecov-action@v2
+        with:
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.xml

@@ -1,37 +1,9 @@
-"""
-Copyright Astronomer, Inc.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-"""
-
-"""
-Unittest module to test Operators.
-
-Requires the unittest, pytest, and requests-mock Python libraries.
-
-"""
 import logging
 import os
 import pathlib
-import random
-import unittest.mock
 
 import pytest
 from airflow.exceptions import BackfillUnfinished
-from airflow.hooks.sqlite_hook import SqliteHook
-from airflow.models import DAG, DagRun
-from airflow.providers.google.cloud.hooks.bigquery import BigQueryHook
-from airflow.providers.postgres.hooks.postgres import PostgresHook
 from airflow.utils import timezone
 
 import astro.sql as aql

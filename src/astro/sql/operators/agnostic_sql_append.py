@@ -4,11 +4,12 @@ from typing import Dict, List
 from sqlalchemy import MetaData, cast, column, insert, select
 from sqlalchemy.sql.schema import Table as SqlaTable
 
+from astro.constants import Database
 from astro.sql.operators.sql_decorator import SqlDecoratedOperator
 from astro.sql.table import Table
+from astro.utils.database import get_database_name
 from astro.utils.schema_util import (
     get_error_string_for_multiple_dbs,
-    get_table_name,
     tables_from_same_db,
 )
 from astro.utils.table_handler import TableHandler
@@ -72,16 +73,16 @@ class SqlAppendOperator(SqlDecoratedOperator, TableHandler):
         self, main_table: Table, columns, casted_columns, append_table: Table, conn_id
     ):
         engine = self.get_sql_alchemy_engine()
-        if self.conn_type in ["postgres", "postgresql"]:
+        if self.schema and get_database_name(engine) != Database.SQLITE:
             metadata = MetaData(schema=self.schema)
         else:
             metadata = MetaData()
         # TO Do - fix bigquery and postgres reflection table issue.
         main_table_sqla = SqlaTable(
-            get_table_name(main_table), metadata, autoload_with=engine
+            main_table.table_name, metadata, autoload_with=engine
         )
         append_table_sqla = SqlaTable(
-            get_table_name(append_table), metadata, autoload_with=engine
+            append_table.table_name, metadata, autoload_with=engine
         )
 
         column_names = [column(c) for c in columns]
@@ -90,7 +91,7 @@ class SqlAppendOperator(SqlDecoratedOperator, TableHandler):
             cast(column(k), getattr(sqlalchemy, v)) for k, v in casted_columns.items()
         ]
         main_columns = [k for k, v in casted_columns.items()]
-        main_columns.extend([c for c in columns])
+        main_columns.extend(list(columns))
 
         if len(column_names) + len(casted_fields) == 0:
             column_names = [column(c) for c in append_table_sqla.c.keys()]

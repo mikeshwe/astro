@@ -4,13 +4,12 @@ import pandas as pd
 import pytest
 from airflow.models import DAG, DagRun
 from airflow.models import TaskInstance as TI
-from airflow.providers.postgres.hooks.postgres import PostgresHook
 from airflow.utils import timezone
 from airflow.utils.session import create_session
 
 import astro.sql as aql
 from astro import dataframe as adf
-from astro.sql.table import Table, TempTable
+from astro.sql.table import Table
 from tests.operators import utils as test_utils
 
 log = logging.getLogger(__name__)
@@ -63,9 +62,8 @@ def test_postgres_to_dataframe_partial_output(output_table, dag):
 def test_with_invalid_dag_name(sample_dag):
     """
     TODO: There appears to be a bug when passing an "invalid" DAG name to pandas when creating a dataframe
-    This issue can be tracked here: https://app.zenhub.com/workspaces/astro-61e7a085a496df00172965bd/issues/astro-projects/astro/212
-    :param sample_dag:
-    :return:
+    This issue can be tracked here:
+    https://app.zenhub.com/workspaces/astro-61e7a085a496df00172965bd/issues/astro-projects/astro/212
     """
     sample_dag.dag_id = "my=dag"
 

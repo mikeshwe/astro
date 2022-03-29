@@ -1,7 +1,11 @@
+import random
+import string
+
 from airflow.hooks.base import BaseHook
 from airflow.models import DagRun, TaskInstance
 
-from astro.constants import Database
+from astro.constants import UNIQUE_TABLE_NAME_LENGTH, Database
+from astro.settings import SCHEMA
 from astro.utils import get_hook
 from astro.utils.database import get_database_name
 
@@ -54,7 +58,10 @@ class Table:
             )
 
     def __str__(self):
-        return f"Table(table_name={self.table_name}, database={self.database}, schema={self.schema}, conn_id={self.conn_id}, warehouse={self.warehouse}, role={self.role})"
+        return (
+            f"Table(table_name={self.table_name}, database={self.database}, "
+            f"schema={self.schema}, conn_id={self.conn_id}, warehouse={self.warehouse}, role={self.role})"
+        )
 
     def drop(self):
         hook = get_hook(
@@ -72,7 +79,7 @@ class Table:
 
 
 class TempTable(Table):
-    def __init__(self, conn_id=None, database=None, warehouse="", role=""):
+    def __init__(self, conn_id=None, database=None, schema=None, warehouse="", role=""):
         self.table_name = ""
         super().__init__(
             table_name=self.table_name,
@@ -80,18 +87,20 @@ class TempTable(Table):
             database=database,
             warehouse=warehouse,
             role=role,
+            schema=schema,
         )
 
     def to_table(self, table_name: str, schema: str = None) -> Table:
         self.table_name = table_name
-        self.schema = schema
+        self.schema = schema or self.schema or SCHEMA
+
         return Table(
             table_name=table_name,
             conn_id=self.conn_id,
             database=self.database,
             warehouse=self.warehouse,
             role=self.role,
-            schema=schema,
+            schema=self.schema,
         )
 
 
@@ -104,3 +113,16 @@ def create_table_name(context) -> str:
     if not table_name.isidentifier():
         table_name = f'"{table_name}"'
     return table_name
+
+
+def create_unique_table_name(length: int = UNIQUE_TABLE_NAME_LENGTH) -> str:
+    """
+    Create a unique table name of the requested size, which is compatible with all supported databases.
+
+    :return: Unique table name
+    :rtype: str
+    """
+    unique_id = random.choice(string.ascii_lowercase) + "".join(
+        random.choice(string.ascii_lowercase + string.digits) for _ in range(length - 1)
+    )
+    return unique_id

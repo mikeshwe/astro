@@ -1,19 +1,4 @@
 """
-Copyright Astronomer, Inc.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-"""
-"""
 Unittest module to test Agnostic Load File function.
 
 Requires the unittest, pytest, and requests-mock Python libraries.
@@ -37,7 +22,6 @@ import pandas as pd
 import pytest
 from airflow.models import DAG, DagRun
 from airflow.models import TaskInstance as TI
-from airflow.providers.google.cloud.hooks.bigquery import BigQueryHook
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 from airflow.utils import timezone
 from airflow.utils.session import create_session
@@ -98,7 +82,7 @@ class TestSaveFile(unittest.TestCase):
         with self.dag:
             f = decorator_func(*op_args, **op_kwargs)
 
-        dr = self.dag.create_dagrun(
+        self.dag.create_dagrun(
             run_id=DagRunType.MANUAL.value,
             start_date=timezone.utcnow(),
             execution_date=DEFAULT_DATE,

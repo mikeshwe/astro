@@ -1,16 +1,8 @@
-import json
 import os
-from urllib import parse
 
 from airflow.hooks.base import BaseHook
 
-from astro.utils.dependencies import (
-    AwsBaseHook,
-    BotoSession,
-    GCSClient,
-    GCSHook,
-    google_service_account,
-)
+from astro.utils.dependencies import AwsBaseHook, BotoSession, GCSClient, GCSHook
 
 
 def parse_s3_env_var():
@@ -32,7 +24,7 @@ def s3fs_creds(conn_id=None):
             aws_access_key_id=key,
             aws_secret_access_key=secret,
         )
-    return dict(client=session.client("s3"))
+    return {"client": session.client("s3")}
 
 
 def gcs_client(conn_id=None):
@@ -45,4 +37,4 @@ def gcs_client(conn_id=None):
     else:
         client = GCSClient()
 
-    return dict(client=client)
+    return {"client": client}

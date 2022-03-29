@@ -9,12 +9,18 @@ def bigquery_merge_func(
     merge_columns,
     conflict_strategy,
 ):
-    statement = f"MERGE {target_table.schema}.{target_table.table_name} T USING {merge_table.schema}.{merge_table.table_name} S\
-                ON {' AND '.join(['T.'+col +'= S.'+col for col in merge_keys])}\
+    statement = f"MERGE {target_table.qualified_name()} T USING {merge_table.qualified_name()} S\
+                ON {' AND '.join(['T.' + col + '= S.' + col for col in merge_keys])}\
                 WHEN NOT MATCHED BY TARGET THEN INSERT ({','.join(target_columns)}) VALUES ({','.join(merge_columns)})"
 
     if conflict_strategy == "update":
-        update_statement = f"UPDATE SET {', '.join(['T.' + target_columns[index] + '=S.' + merge_columns[index] for index in range(len(target_columns))])}"
+        update_statement = "UPDATE SET {}".format(
+            ", ".join(
+                [
+                    f"T.{target_columns[idx]}=S.{merge_columns[idx]}"
+                    for idx in range(len(target_columns))
+                ]
+            )
+        )
         statement += f" WHEN MATCHED THEN {update_statement}"
-
     return statement, {}

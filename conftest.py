@@ -1,7 +1,5 @@
 import os
 import pathlib
-import random
-import string
 import uuid
 
 import pytest
@@ -9,15 +7,17 @@ import yaml
 from airflow import settings
 from airflow.models import DAG, Connection, DagRun
 from airflow.models import TaskInstance as TI
-from airflow.providers.sqlite.hooks.sqlite import SqliteHook
 from airflow.utils import timezone
 from airflow.utils.db import create_default_connections
-from airflow.utils.session import create_session
+from airflow.utils.session import create_session, provide_session
 
+from astro.constants import Database
 from astro.settings import SCHEMA
-from astro.sql.table import Table, TempTable
+from astro.sql.table import Table, TempTable, create_unique_table_name
 from astro.utils.cloud_storage_creds import parse_s3_env_var
-from astro.utils.dependencies import BigQueryHook, PostgresHook, SnowflakeHook, gcs, s3
+from astro.utils.database import get_database_name
+from astro.utils.dependencies import BigQueryHook, gcs, s3
+from src.astro.constants import FileType
 from tests.operators import utils as test_utils
 
 DEFAULT_DATE = timezone.datetime(2016, 1, 1)
@@ -25,6 +25,17 @@ DEFAULT_DATE = timezone.datetime(2016, 1, 1)
 OUTPUT_TABLE_NAME = test_utils.get_table_name("integration_test_table")
 UNIQUE_HASH_SIZE = 16
 CWD = pathlib.Path(__file__).parent
+
+
+@provide_session
+def get_session(session=None):
+    create_default_connections(session)
+    return session
+
+
+@pytest.fixture()
+def session():
+    return get_session()
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -44,19 +55,9 @@ def create_database_connections():
             session.add(conn)
 
 
-def _create_unique_dag_id():
-    # To use 32 chars was too long for the DAG & SQL name table, for this reason we are not using:
-    # unique_id = str(uuid.uuid4()).replace("-", "")
-    unique_id = "".join(
-        random.choice(string.ascii_lowercase + string.digits)
-        for _ in range(UNIQUE_HASH_SIZE)
-    )
-    return f"test_dag_{unique_id}"
-
-
 @pytest.fixture
 def sample_dag():
-    dag_id = _create_unique_dag_id()
+    dag_id = create_unique_table_name(UNIQUE_HASH_SIZE)
     yield DAG(dag_id, default_args={"owner": "airflow", "start_date": DEFAULT_DATE})
     with create_session() as session:
         session.query(DagRun).delete()
@@ -72,35 +73,34 @@ def test_table(request, sql_server):
         is_tmp_table = request.param.get("is_temp", True)
         table_options = request.param.get("param", {})
     sql_name, hook = sql_server
+    database = get_database_name(hook)
 
-    if isinstance(hook, SnowflakeHook):
+    if database == Database.SNOWFLAKE:
         params = {
             "conn_id": hook.snowflake_conn_id,
             "database": hook.database,
             "warehouse": hook.warehouse,
+            "schema": hook.schema,
         }
-    elif isinstance(hook, PostgresHook):
+    elif database == Database.POSTGRES:
         params = {"conn_id": hook.postgres_conn_id, "database": hook.schema}
-    elif isinstance(hook, SqliteHook):
+    elif database == Database.SQLITE:
         params = {"conn_id": hook.sqlite_conn_id, "database": "sqlite"}
-    elif isinstance(hook, BigQueryHook):
-        params = {
-            "conn_id": hook.gcp_conn_id,
-        }
+    elif database == Database.BIGQUERY:
+        params = {"conn_id": hook.gcp_conn_id, "schema": SCHEMA}
     else:
         raise ValueError("Unsupported Database")
-
     params.update(table_options)
     table = TempTable(**params) if is_tmp_table else Table(**params)
 
     yield table
 
-    if isinstance(hook, SqliteHook):
-        hook.run(f"DROP TABLE IF EXISTS {table.table_name}")
-        hook.run(f"DROP INDEX IF EXISTS unique_index")
-    elif isinstance(hook, SnowflakeHook):
-        hook.run(f"DROP TABLE IF EXISTS {table.table_name}")
-    elif not isinstance(hook, BigQueryHook):
+    if table.qualified_name():
+        hook.run(f"DROP TABLE IF EXISTS {table.qualified_name()}")
+
+    if database == Database.SQLITE:
+        hook.run("DROP INDEX IF EXISTS unique_index")
+    elif database in (Database.POSTGRES, Database.POSTGRESQL):
         # There are some tests (e.g. test_agnostic_merge.py) which create stuff which are not being deleted
         # Example: tables which are not fixtures and constraints. This is an aggressive approach towards tearing down:
         hook.run(f"DROP SCHEMA IF EXISTS {table.schema} CASCADE;")
@@ -137,7 +137,8 @@ def sql_server(request):
 def remote_file(request):
     param = request.param
     provider = param["name"]
-    no_of_files = param["count"] if "count" in param else 1
+    no_of_files = param.get("count", 1)
+    file_extension = param.get("filetype", FileType.CSV).value
 
     if provider == "google":
         conn_id = "test_google"
@@ -153,7 +154,7 @@ def remote_file(request):
         conn_type = "S3"
         extra = {"aws_access_key_id": key, "aws_secret_access_key": secret}
     else:
-        raise ValueError(f"File location {request.param} not supported")
+        raise ValueError(f"File location {provider} not supported")
 
     new_connection = Connection(conn_id=conn_id, conn_type=conn_type, extra=extra)
     session = settings.Session()
@@ -165,11 +166,11 @@ def remote_file(request):
         session.add(new_connection)
         session.commit()
 
-    filename = pathlib.Path("tests/data/sample.csv")
+    filename = pathlib.Path(f"tests/data/sample.{file_extension}")
     object_paths = []
     unique_value = uuid.uuid4()
     for count in range(no_of_files):
-        object_prefix = f"test/{unique_value}__{count}.csv"
+        object_prefix = f"test/{unique_value}__{count}.{file_extension}"
         if provider == "google":
             bucket_name = os.getenv("GOOGLE_BUCKET", "dag-authoring")
             hook = gcs.GCSHook(gcp_conn_id=conn_id)
@@ -186,7 +187,7 @@ def remote_file(request):
     yield conn_id, object_paths
 
     for count in range(no_of_files):
-        object_prefix = f"test/{unique_value}__{count}.csv"
+        object_prefix = f"test/{unique_value}__{count}.{file_extension}"
         if provider == "google":
             if hook.exists(bucket_name, object_prefix):
                 hook.delete(bucket_name, object_prefix)

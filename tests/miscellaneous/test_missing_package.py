@@ -1,18 +1,3 @@
-"""
-Copyright Astronomer, Inc.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-"""
 import pytest
 
 """
@@ -23,16 +8,11 @@ Requires the unittest, pytest, and requests-mock Python libraries.
 """
 
 import logging
-import math
-import os
 import pathlib
 import sys
 import unittest.mock
 
-from airflow.models import DAG
 from airflow.utils import timezone
-from airflow.utils.state import State
-from airflow.utils.types import DagRunType
 
 log = logging.getLogger(__name__)
 DEFAULT_DATE = timezone.datetime(2016, 1, 1)

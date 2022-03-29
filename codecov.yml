@@ -3,7 +3,5 @@ coverage:
     project:
       default:
         target: auto
-        threshold: 2%
-ignore:
-  - "test_*.py"
-  - "*/**/tests/*"
+        threshold: 5%
+        only_pulls: true

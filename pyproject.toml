@@ -7,10 +7,7 @@ name = "astro-projects"
 dynamic = ["version", "description"]
 
 authors = [
-    {name = "Daniel Imberman", email = "daniel@astronomer.io"},
-    {name = "Plinio Guzman"},
-    {name = "Utkarsh Sharma", email = "utkarsh.sharma@astronomer.io"},
-    {name = "Tatiana Al-Chueyr", email = "tatiana.alchueyr@astronomer.io"}
+    {name = "Astronomer", email = "humans@astronomer.io"},
 ]
 readme = "README.md"
 license = {file = "LICENSE"}
@@ -22,7 +19,8 @@ dependencies = [
     "pandas>=1.3.4,<=1.3.5",
     "SQLAlchemy>=1.3.18,<=1.3.24",
     "markupsafe>=1.1.1,<2.1.0",
-    "smart-open"
+    "smart-open",
+    "pyarrow"
 ]
 
 keywords = ["airflow", "provider", "astronomer", "sql", "decorator", "task flow", "elt", "etl", "dag"]
@@ -86,8 +84,13 @@ Home = "https://astronomer.io/"
 provider_info = "astro.__init__:get_provider_info"
 
 [tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "--cov=src --cov-report=xml --cov-branch"
 env_files = [".env"]
 testpaths = ["tests"]
+markers = [
+    "integration"
+]
 
 [tool.flit.module]
 name = "astro"  # Or "astro.sql" if you just want this directory, not the entire 'astro'.
