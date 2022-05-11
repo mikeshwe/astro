@@ -41,6 +41,10 @@ class BaseDatabase(ABC):
         """Return an instance of the database-specific Airflow hook."""
         raise NotImplementedError
 
+    def replace_illegal_columns_chars(self, char: str) -> str:
+        """Return an instance of the database-specific Airflow hook."""
+        return char
+
     @property
     def connection(self) -> sqlalchemy.engine.base.Connection:
         """Return a Sqlalchemy connection object for the given database."""

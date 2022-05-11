@@ -4,12 +4,11 @@ from airflow.hooks.base import BaseHook
 from airflow.models import BaseOperator
 from airflow.models.xcom_arg import XComArg
 
-from astro.constants import DEFAULT_CHUNK_SIZE
+from astro.constants import DEFAULT_CHUNK_SIZE, LoadExistStrategy
+from astro.databases import BaseDatabase, create_database
 from astro.files import get_files
 from astro.sql.table import Table, TempTable, create_table_name
-from astro.utils import get_hook
-from astro.utils.database import create_database_from_conn_id
-from astro.utils.load import load_dataframe_into_sql_table, populate_normalize_config
+from astro.utils.load import populate_normalize_config
 from astro.utils.task_id_helper import get_task_id
 
 
@@ -35,7 +34,7 @@ class AgnosticLoadFile(BaseOperator):
         output_table: Union[TempTable, Table],
         file_conn_id: Optional[str] = "",
         chunksize: int = DEFAULT_CHUNK_SIZE,
-        if_exists: str = "replace",
+        if_exists: LoadExistStrategy = "replace",
         ndjson_normalize_sep: str = "_",
         **kwargs,
     ) -> None:
@@ -56,23 +55,20 @@ class AgnosticLoadFile(BaseOperator):
         if self.file_conn_id:
             BaseHook.get_connection(self.file_conn_id)
 
+        database = create_database(self.output_table.conn_id)
+
         self.normalize_config = populate_normalize_config(
             ndjson_normalize_sep=self.ndjson_normalize_sep,
-            database=create_database_from_conn_id(self.output_table.conn_id),
-        )
-
-        hook = get_hook(
-            conn_id=self.output_table.conn_id,
-            database=self.output_table.database,
-            schema=self.output_table.schema,
-            warehouse=self.output_table.warehouse,
+            database=database,
         )
 
         self._configure_output_table(context)
-        return self.load_data(hook=hook, path=self.path, file_conn_id=self.file_conn_id)
+        return self.load_data(
+            database=database, path=self.path, file_conn_id=self.file_conn_id
+        )
 
     def load_data(
-        self, path: str, hook: BaseHook, file_conn_id: Optional[str] = None
+        self, path: str, database: BaseDatabase, file_conn_id: Optional[str] = None
     ) -> Union[TempTable, Table]:
         """Loads csv/parquet table from local/S3/GCS with Pandas.
         Infers SQL database type based on connection then loads table to db.
@@ -82,13 +78,11 @@ class AgnosticLoadFile(BaseOperator):
         for file in get_files(
             path, file_conn_id, normalize_config=self.normalize_config
         ):
-            dataframe = file.export_to_dataframe()
-            load_dataframe_into_sql_table(
-                dataframe,
-                self.output_table,
-                hook,
-                self.chunksize,
+            database.load_pandas_dataframe_to_table(
+                source_dataframe=file.export_to_dataframe(),
+                target_table=self.output_table,
                 if_exists=if_exists,
+                chunk_size=self.chunksize,
             )
             if_exists = "append"
 
@@ -111,7 +105,7 @@ def load_file(
     output_table: Union[TempTable, Table],
     file_conn_id: Optional[str] = "",
     task_id: Optional[str] = None,
-    if_exists: str = "replace",
+    if_exists: LoadExistStrategy = "replace",
     ndjson_normalize_sep: str = "_",
     **kwargs,
 ) -> XComArg:

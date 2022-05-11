@@ -92,3 +92,7 @@ class BigqueryDatabase(BaseDatabase):
             chunksize=chunk_size,
             project_id=self.hook.project_id,
         )
+
+    def replace_illegal_columns_chars(self, char) -> str:
+        replacements = {".": "_"}
+        return str(replacements[char] if char in replacements else char)
