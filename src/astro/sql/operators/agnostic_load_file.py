@@ -7,7 +7,7 @@ from airflow.models.xcom_arg import XComArg
 from astro.constants import DEFAULT_CHUNK_SIZE, LoadExistStrategy
 from astro.databases import BaseDatabase, create_database
 from astro.files import get_files
-from astro.sql.table import Table, TempTable, create_table_name
+from astro.sql.table import Table, TempTable
 from astro.utils.load import populate_normalize_config
 from astro.utils.task_id_helper import get_task_id
 
@@ -33,7 +33,7 @@ class AgnosticLoadFile(BaseOperator):
         path: str,
         output_table: Union[TempTable, Table],
         file_conn_id: Optional[str] = "",
-        chunksize: int = DEFAULT_CHUNK_SIZE,
+        chunk_size: int = DEFAULT_CHUNK_SIZE,
         if_exists: LoadExistStrategy = "replace",
         ndjson_normalize_sep: str = "_",
         **kwargs,
@@ -41,7 +41,7 @@ class AgnosticLoadFile(BaseOperator):
         super().__init__(**kwargs)
         self.output_table: Union[TempTable, Table] = output_table
         self.path = path
-        self.chunksize = chunksize
+        self.chunk_size = chunk_size
         self.file_conn_id = file_conn_id
         self.kwargs = kwargs
         self.if_exists = if_exists
@@ -62,7 +62,7 @@ class AgnosticLoadFile(BaseOperator):
             database=database,
         )
 
-        self._configure_output_table(context)
+        # self._configure_output_table(context)
         return self.load_data(
             database=database, path=self.path, file_conn_id=self.file_conn_id
         )
@@ -82,7 +82,7 @@ class AgnosticLoadFile(BaseOperator):
                 source_dataframe=file.export_to_dataframe(),
                 target_table=self.output_table,
                 if_exists=if_exists,
-                chunk_size=self.chunksize,
+                chunk_size=self.chunk_size,
             )
             if_exists = "append"
 
@@ -90,14 +90,14 @@ class AgnosticLoadFile(BaseOperator):
 
         return self.output_table
 
-    def _configure_output_table(self, context: Any) -> None:
-        # TODO: Move this function to the SQLDecorator, so it can be reused across operators
-        if isinstance(self.output_table, TempTable):
-            self.output_table = self.output_table.to_table(
-                create_table_name(context=context)
-            )
-        if not self.output_table.table_name:
-            self.output_table.table_name = create_table_name(context=context)
+    # def _configure_output_table(self, context: Any) -> None:
+    #     # TODO: Move this function to the SQLDecorator, so it can be reused across operators
+    #     if isinstance(self.output_table, TempTable):
+    #         self.output_table = self.output_table.to_table(
+    #             create_table_name(context=context)
+    #         )
+    #     if not self.output_table.table_name:
+    #         self.output_table.table_name = create_table_name(context=context)
 
 
 def load_file(

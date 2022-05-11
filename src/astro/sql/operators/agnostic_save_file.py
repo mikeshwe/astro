@@ -1,15 +1,12 @@
-from typing import Iterator, Optional, Union
+from typing import Optional, Union
 
 import pandas as pd
 from airflow.models import BaseOperator
 from airflow.models.xcom_arg import XComArg
-from airflow.providers.sqlite.hooks.sqlite import SqliteHook
 
-from astro.constants import Database
+from astro.databases import create_database
 from astro.files import File
 from astro.sql.table import Table
-from astro.utils.database import create_database_from_conn_id
-from astro.utils.dependencies import BigQueryHook, PostgresHook, SnowflakeHook
 from astro.utils.task_id_helper import get_task_id
 
 
@@ -54,7 +51,8 @@ class SaveFile(BaseOperator):
         """
         # Infer db type from `input_conn_id`.
         if type(self.input_data) is Table:
-            df = self.convert_sql_table_to_dataframe()
+            database = create_database(self.input_data.conn_id)
+            df = database.export_table_to_pandas_dataframe(self.input_data)
         elif type(self.input_data) is pd.DataFrame:
             df = self.input_data
         else:
@@ -69,50 +67,50 @@ class SaveFile(BaseOperator):
         else:
             raise FileExistsError(f"{self.output_file_path} file already exists.")
 
-    def convert_sql_table_to_dataframe(
-        self,
-    ) -> Union[pd.DataFrame, Iterator[pd.DataFrame]]:
-        input_table = self.input_data
-        database = create_database_from_conn_id(input_table.conn_id)
-
-        # Select database Hook based on `conn` type
-        hook_kwargs = {
-            Database.POSTGRES: {
-                "postgres_conn_id": input_table.conn_id,
-                "schema": input_table.database,
-            },
-            Database.SNOWFLAKE: {
-                "snowflake_conn_id": input_table.conn_id,
-                "database": input_table.database,
-                "schema": input_table.schema,
-                "warehouse": input_table.warehouse,
-            },
-            Database.BIGQUERY: {
-                "use_legacy_sql": False,
-                "gcp_conn_id": input_table.conn_id,
-            },
-            Database.SQLITE: {"sqlite_conn_id": input_table.conn_id},
-        }
-
-        hook_class = {
-            Database.POSTGRES: PostgresHook,
-            Database.SNOWFLAKE: SnowflakeHook,
-            Database.BIGQUERY: BigQueryHook,
-            Database.SQLITE: SqliteHook,
-        }
-
-        try:
-            input_hook = hook_class[database](**hook_kwargs[database])
-        except KeyError:
-            raise ValueError(
-                f"The conn_id {input_table.conn_id} is of unsupported type {database}. "
-                f"Support types: {list(hook_class.keys())}"
-            )
-
-        return pd.read_sql(
-            f"SELECT * FROM {input_table.qualified_name()}",
-            con=input_hook.get_sqlalchemy_engine(),
-        )
+    # def convert_sql_table_to_dataframe(
+    #     self,
+    # ) -> Union[pd.DataFrame, Iterator[pd.DataFrame]]:
+    #     input_table = self.input_data
+    #     database = create_database_from_conn_id(input_table.conn_id)
+    #
+    #     # Select database Hook based on `conn` type
+    #     hook_kwargs = {
+    #         Database.POSTGRES: {
+    #             "postgres_conn_id": input_table.conn_id,
+    #             "schema": input_table.database,
+    #         },
+    #         Database.SNOWFLAKE: {
+    #             "snowflake_conn_id": input_table.conn_id,
+    #             "database": input_table.database,
+    #             "schema": input_table.schema,
+    #             "warehouse": input_table.warehouse,
+    #         },
+    #         Database.BIGQUERY: {
+    #             "use_legacy_sql": False,
+    #             "gcp_conn_id": input_table.conn_id,
+    #         },
+    #         Database.SQLITE: {"sqlite_conn_id": input_table.conn_id},
+    #     }
+    #
+    #     hook_class = {
+    #         Database.POSTGRES: PostgresHook,
+    #         Database.SNOWFLAKE: SnowflakeHook,
+    #         Database.BIGQUERY: BigQueryHook,
+    #         Database.SQLITE: SqliteHook,
+    #     }
+    #
+    #     try:
+    #         input_hook = hook_class[database](**hook_kwargs[database])
+    #     except KeyError:
+    #         raise ValueError(
+    #             f"The conn_id {input_table.conn_id} is of unsupported type {database}. "
+    #             f"Support types: {list(hook_class.keys())}"
+    #         )
+    #
+    #     return pd.read_sql(
+    #         f"SELECT * FROM {input_table.qualified_name()}",
+    #         con=input_hook.get_sqlalchemy_engine(),
+    #     )
 
 
 def save_file(
