@@ -6,7 +6,7 @@ from airflow.models.xcom_arg import XComArg
 
 from astro.databases import create_database
 from astro.files import File
-from astro.sql.table import Table
+from astro.sql.tables import Table
 from astro.utils.task_id_helper import get_task_id
 
 
@@ -66,51 +66,6 @@ class SaveFile(BaseOperator):
             file.create_from_dataframe(df)
         else:
             raise FileExistsError(f"{self.output_file_path} file already exists.")
-
-    # def convert_sql_table_to_dataframe(
-    #     self,
-    # ) -> Union[pd.DataFrame, Iterator[pd.DataFrame]]:
-    #     input_table = self.input_data
-    #     database = create_database_from_conn_id(input_table.conn_id)
-    #
-    #     # Select database Hook based on `conn` type
-    #     hook_kwargs = {
-    #         Database.POSTGRES: {
-    #             "postgres_conn_id": input_table.conn_id,
-    #             "schema": input_table.database,
-    #         },
-    #         Database.SNOWFLAKE: {
-    #             "snowflake_conn_id": input_table.conn_id,
-    #             "database": input_table.database,
-    #             "schema": input_table.schema,
-    #             "warehouse": input_table.warehouse,
-    #         },
-    #         Database.BIGQUERY: {
-    #             "use_legacy_sql": False,
-    #             "gcp_conn_id": input_table.conn_id,
-    #         },
-    #         Database.SQLITE: {"sqlite_conn_id": input_table.conn_id},
-    #     }
-    #
-    #     hook_class = {
-    #         Database.POSTGRES: PostgresHook,
-    #         Database.SNOWFLAKE: SnowflakeHook,
-    #         Database.BIGQUERY: BigQueryHook,
-    #         Database.SQLITE: SqliteHook,
-    #     }
-    #
-    #     try:
-    #         input_hook = hook_class[database](**hook_kwargs[database])
-    #     except KeyError:
-    #         raise ValueError(
-    #             f"The conn_id {input_table.conn_id} is of unsupported type {database}. "
-    #             f"Support types: {list(hook_class.keys())}"
-    #         )
-    #
-    #     return pd.read_sql(
-    #         f"SELECT * FROM {input_table.qualified_name()}",
-    #         con=input_hook.get_sqlalchemy_engine(),
-    #     )
 
 
 def save_file(

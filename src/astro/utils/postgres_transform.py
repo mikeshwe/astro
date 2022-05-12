@@ -7,4 +7,5 @@ def add_templates_to_context(parameters, context):
             context[k] = v.qualified_name()
         else:
             context[k] = ":" + k
+            context[k] = ":" + k
     return context
