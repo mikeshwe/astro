@@ -38,22 +38,22 @@ CWD = pathlib.Path(__file__).parent
     "sql_server", ["snowflake", "postgres", "bigquery", "sqlite"], indirect=True
 )
 @pytest.mark.parametrize(
-    "test_table",
-    [{"is_temp": True}, {"is_temp": False}],
+    "table_fixture",
+    [{}, {}],
     indirect=True,
     ids=["temp_table", "named_table"],
 )
-def test_load_file_with_http_path_file(sample_dag, test_table, sql_server):
+def test_load_file_with_http_path_file(sample_dag, table_fixture, sql_server):
     sql_name, hook = sql_server
     with sample_dag:
         load_file(
             path="https://raw.githubusercontent.com/astro-projects/astro/main/tests/data/homes_main.csv",
             file_conn_id="",
-            output_table=test_table,
+            output_table=table_fixture,
         )
     test_utils.run_dag(sample_dag)
 
-    df = test_utils.get_dataframe_from_table(sql_name, test_table, hook)
+    df = test_utils.get_dataframe_from_table(sql_name, table_fixture, hook)
     assert df.shape == (3, 9)
 
 

@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional
 
 from airflow.hooks.base import BaseHook
 from airflow.models import BaseOperator
@@ -7,7 +7,9 @@ from airflow.models.xcom_arg import XComArg
 from astro.constants import DEFAULT_CHUNK_SIZE, LoadExistStrategy
 from astro.databases import BaseDatabase, create_database
 from astro.files import get_files
-from astro.sql.table import Table, TempTable
+
+# from astro.sql.table import Table, TempTable
+from astro.sql.tables import Table
 from astro.utils.load import populate_normalize_config
 from astro.utils.task_id_helper import get_task_id
 
@@ -31,7 +33,7 @@ class AgnosticLoadFile(BaseOperator):
     def __init__(
         self,
         path: str,
-        output_table: Union[TempTable, Table],
+        output_table: Table,
         file_conn_id: Optional[str] = "",
         chunk_size: int = DEFAULT_CHUNK_SIZE,
         if_exists: LoadExistStrategy = "replace",
@@ -39,7 +41,7 @@ class AgnosticLoadFile(BaseOperator):
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
-        self.output_table: Union[TempTable, Table] = output_table
+        self.output_table: Table = output_table
         self.path = path
         self.chunk_size = chunk_size
         self.file_conn_id = file_conn_id
@@ -48,7 +50,7 @@ class AgnosticLoadFile(BaseOperator):
         self.ndjson_normalize_sep = ndjson_normalize_sep
         self.normalize_config: Dict[str, str] = {}
 
-    def execute(self, context: Any) -> Union[TempTable, Table]:
+    def execute(self, context: Any) -> Table:
         """
         Load an existing dataset from a supported file into a SQL table.
         """
@@ -69,7 +71,7 @@ class AgnosticLoadFile(BaseOperator):
 
     def load_data(
         self, path: str, database: BaseDatabase, file_conn_id: Optional[str] = None
-    ) -> Union[TempTable, Table]:
+    ) -> Table:
         """Loads csv/parquet table from local/S3/GCS with Pandas.
         Infers SQL database type based on connection then loads table to db.
         """
@@ -102,7 +104,7 @@ class AgnosticLoadFile(BaseOperator):
 
 def load_file(
     path: str,
-    output_table: Union[TempTable, Table],
+    output_table: Table,
     file_conn_id: Optional[str] = "",
     task_id: Optional[str] = None,
     if_exists: LoadExistStrategy = "replace",
