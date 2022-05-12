@@ -148,7 +148,7 @@ def test_table(request, sql_server):  # noqa: C901
 @pytest.fixture
 def table_fixture(request, sql_server):  # noqa: C901
     tables = []
-    tables_params = [{"is_temp": True}]
+    tables_params = [{}]
 
     if getattr(request, "param", None):
         if isinstance(request.param, list):

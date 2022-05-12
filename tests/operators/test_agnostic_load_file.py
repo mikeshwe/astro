@@ -21,10 +21,11 @@ from airflow.utils import timezone
 from pandas.testing import assert_frame_equal
 
 from astro.constants import Database
+from astro.databases import create_database
 from astro.sql.operators.agnostic_load_file import load_file
-from astro.sql.table import Table
+from astro.sql.tables import Metadata, Table
 from astro.utils.dependencies import gcs, s3
-from tests.operators import utils as test_utils
+from tests.operators import utils__newtable as test_utils
 
 log = logging.getLogger(__name__)
 DEFAULT_DATE = timezone.datetime(2016, 1, 1)
@@ -39,9 +40,9 @@ CWD = pathlib.Path(__file__).parent
 )
 @pytest.mark.parametrize(
     "table_fixture",
-    [{}, {}],
+    [{}],
     indirect=True,
-    ids=["temp_table", "named_table"],
+    ids=["table"],
 )
 def test_load_file_with_http_path_file(sample_dag, table_fixture, sql_server):
     sql_name, hook = sql_server
@@ -68,22 +69,22 @@ def test_load_file_with_http_path_file(sample_dag, table_fixture, sql_server):
     "sql_server", ["snowflake", "postgres", "bigquery", "sqlite"], indirect=True
 )
 @pytest.mark.parametrize(
-    "test_table",
-    [{"is_temp": True}, {"is_temp": False}],
+    "table_fixture",
+    [{}],
     indirect=True,
-    ids=["temp_table", "named_table"],
+    ids=["table"],
 )
 def test_aql_load_remote_file_to_dbs(
-    sample_dag, test_table, sql_server, remote_files_fixture
+    sample_dag, table_fixture, sql_server, remote_files_fixture
 ):
     sql_name, hook = sql_server
     file_uri = remote_files_fixture[0]
 
     with sample_dag:
-        load_file(path=file_uri, output_table=test_table)
+        load_file(path=file_uri, output_table=table_fixture)
     test_utils.run_dag(sample_dag)
 
-    df = test_utils.get_dataframe_from_table(sql_name, test_table, hook)
+    df = test_utils.get_dataframe_from_table(sql_name, table_fixture, hook)
 
     # Workaround for snowflake capitalized col names
     sort_cols = "name"
@@ -100,22 +101,22 @@ def test_aql_load_remote_file_to_dbs(
     "sql_server", ["snowflake", "postgres", "bigquery", "sqlite"], indirect=True
 )
 @pytest.mark.parametrize(
-    "test_table",
-    [{"is_temp": True}, {"is_temp": False}],
+    "table_fixture",
+    [{}],
     indirect=True,
-    ids=["temp_table", "named_table"],
+    ids=["table"],
 )
-def test_aql_replace_existing_table(sample_dag, test_table, sql_server):
+def test_aql_replace_existing_table(sample_dag, table_fixture, sql_server):
     sql_name, hook = sql_server
     data_path_1 = str(CWD) + "/../data/homes.csv"
     data_path_2 = str(CWD) + "/../data/homes2.csv"
     with sample_dag:
-        task_1 = load_file(path=data_path_1, output_table=test_table)
-        task_2 = load_file(path=data_path_2, output_table=test_table)
+        task_1 = load_file(path=data_path_1, output_table=table_fixture)
+        task_2 = load_file(path=data_path_2, output_table=table_fixture)
         task_1 >> task_2
     test_utils.run_dag(sample_dag)
 
-    df = test_utils.get_dataframe_from_table(sql_name, test_table, hook)
+    df = test_utils.get_dataframe_from_table(sql_name, table_fixture, hook)
     data_df = pd.read_csv(data_path_2)
 
     assert df.shape == data_df.shape
@@ -126,26 +127,25 @@ def test_aql_replace_existing_table(sample_dag, test_table, sql_server):
     "sql_server", ["snowflake", "postgres", "bigquery", "sqlite"], indirect=True
 )
 @pytest.mark.parametrize(
-    "test_table",
-    [{"is_temp": True}, {"is_temp": False}],
+    "table_fixture",
+    [{}],
     indirect=True,
-    ids=["temp_table", "named_table"],
+    ids=["table"],
 )
-def test_aql_local_file_with_no_table_name(sample_dag, test_table, sql_server):
+def test_aql_local_file_with_no_table_name(sample_dag, table_fixture, sql_server):
     sql_name, hook = sql_server
     data_path = str(CWD) + "/../data/homes.csv"
     with sample_dag:
-        load_file(path=data_path, output_table=test_table)
+        load_file(path=data_path, output_table=table_fixture)
     test_utils.run_dag(sample_dag)
 
-    df = test_utils.get_dataframe_from_table(sql_name, test_table, hook)
+    df = test_utils.get_dataframe_from_table(sql_name, table_fixture, hook)
     data_df = pd.read_csv(data_path)
 
     assert df.shape == data_df.shape
 
 
 def test_unique_task_id_for_same_path(sample_dag):
-    OUTPUT_TABLE_NAME = "expected_table_from_csv_1"
 
     tasks = []
 
@@ -155,9 +155,7 @@ def test_unique_task_id_for_same_path(sample_dag):
                 "path": str(CWD) + "/../data/homes.csv",
                 "file_conn_id": "",
                 "output_table": Table(
-                    OUTPUT_TABLE_NAME,
-                    database="pagila",
-                    conn_id="postgres_conn",
+                    conn_id="postgres_conn", metadata=Metadata(database="pagila")
                 ),
             }
             if index == 3:
@@ -186,17 +184,17 @@ def test_aws_decode():
 
 
 @pytest.mark.parametrize("sql_server", ["sqlite"], indirect=True)
-def test_load_file_templated_filename(sample_dag, sql_server, test_table):
+def test_load_file_templated_filename(sample_dag, sql_server, table_fixture):
     database_name, sql_hook = sql_server
     with sample_dag:
         load_file(
             path=str(CWD) + "/../data/{{ var.value.foo }}/example.csv",
             file_conn_id="",
-            output_table=test_table,
+            output_table=table_fixture,
         )
     test_utils.run_dag(sample_dag)
 
-    df = sql_hook.get_pandas_df(f"SELECT * FROM {test_table.qualified_name()}")
+    df = sql_hook.get_pandas_df(f"SELECT * FROM {table_fixture.qualified_name()}")
     assert len(df) == 3
 
 
@@ -209,7 +207,7 @@ def test_load_file_templated_filename(sample_dag, sql_server, test_table):
 )
 @pytest.mark.parametrize("sql_server", ["sqlite"], indirect=True)
 def test_aql_load_file_pattern(
-    remote_files_fixture, sample_dag, test_table, sql_server
+    remote_files_fixture, sample_dag, table_fixture, sql_server
 ):
     remote_object_uri = remote_files_fixture[0]
     filename = pathlib.Path(CWD.parent, "data/sample.csv")
@@ -218,11 +216,11 @@ def test_aql_load_file_pattern(
     with sample_dag:
         load_file(
             path=remote_object_uri[0:-5],
-            output_table=test_table,
+            output_table=table_fixture,
         )
     test_utils.run_dag(sample_dag)
 
-    df = test_utils.get_dataframe_from_table(sql_name, test_table, hook)
+    df = test_utils.get_dataframe_from_table(sql_name, table_fixture, hook)
     test_df_rows = pd.read_csv(filename).shape[0]
 
     assert test_df_rows * 2 == df.shape[0]
@@ -230,7 +228,7 @@ def test_aql_load_file_pattern(
 
 @pytest.mark.integration
 @pytest.mark.parametrize("sql_server", ["postgres"], indirect=True)
-def test_aql_load_file_local_file_pattern(sample_dag, test_table, sql_server):
+def test_aql_load_file_local_file_pattern(sample_dag, table_fixture, sql_server):
     filename = str(CWD.parent) + "/data/homes_pattern_1.csv"
     database_name, sql_hook = sql_server
 
@@ -240,13 +238,15 @@ def test_aql_load_file_local_file_pattern(sample_dag, test_table, sql_server):
         load_file(
             path=str(CWD.parent) + "/data/homes_pattern_*",
             file_conn_id="",
-            output_table=test_table,
+            output_table=table_fixture,
         )
     test_utils.run_dag(sample_dag)
 
     # Read table from db
+    db = create_database(table_fixture.conn_id)
     df = pd.read_sql(
-        f"SELECT * FROM {test_table.qualified_name()}", con=sql_hook.get_conn()
+        f"SELECT * FROM {db.get_table_qualified_name(table_fixture)}",
+        con=sql_hook.get_conn(),
     )
     assert test_df_rows * 2 == df.shape[0]
 
@@ -260,7 +260,7 @@ def test_aql_load_file_local_file_pattern(sample_dag, test_table, sql_server):
     ids=["google", "amazon"],
 )
 def test_load_file_using_file_connection(
-    sample_dag, remote_files_fixture, sql_server, test_table
+    sample_dag, remote_files_fixture, sql_server, table_fixture
 ):
     database_name, sql_hook = sql_server
     file_uri = remote_files_fixture[0]
@@ -272,11 +272,14 @@ def test_load_file_using_file_connection(
         load_file(
             path=file_uri,
             file_conn_id=file_conn_id,
-            output_table=test_table,
+            output_table=table_fixture,
         )
     test_utils.run_dag(sample_dag)
 
-    df = sql_hook.get_pandas_df(f"SELECT * FROM {test_table.qualified_name()}")
+    db = create_database(table_fixture.conn_id)
+    df = sql_hook.get_pandas_df(
+        f"SELECT * FROM {db.get_table_qualified_name(table_fixture)}"
+    )
     assert len(df) == 3
 
 
@@ -293,7 +296,7 @@ def test_load_file_using_file_connection_fails_nonexistent_conn(
     task_params = {
         "path": file_uri,
         "file_conn_id": file_conn_id,
-        "output_table": Table(table_name=OUTPUT_TABLE_NAME, **sql_server_params),
+        "output_table": Table(name=OUTPUT_TABLE_NAME, **sql_server_params),
     }
     with pytest.raises(BackfillUnfinished):
         with sample_dag:
@@ -308,16 +311,19 @@ def test_load_file_using_file_connection_fails_nonexistent_conn(
     "sql_server", ["snowflake", "postgres", "bigquery", "sqlite"], indirect=True
 )
 @pytest.mark.parametrize("file_type", ["parquet", "ndjson", "json", "csv"])
-def test_load_file(sample_dag, sql_server, file_type, test_table):
+def test_load_file(sample_dag, sql_server, file_type, table_fixture):
     database_name, sql_hook = sql_server
     with sample_dag:
         load_file(
             path=str(pathlib.Path(CWD.parent, f"data/sample.{file_type}")),
             file_conn_id="",
-            output_table=test_table,
+            output_table=table_fixture,
         )
     test_utils.run_dag(sample_dag)
-    df = sql_hook.get_pandas_df(f"SELECT * FROM {test_table.qualified_name()}")
+    db = create_database(table_fixture.conn_id)
+    df = sql_hook.get_pandas_df(
+        f"SELECT * FROM {db.get_table_qualified_name(table_fixture)}"
+    )
 
     assert len(df) == 3
     expected = pd.DataFrame(
@@ -343,22 +349,25 @@ def test_load_file(sample_dag, sql_server, file_type, test_table):
     indirect=True,
 )
 @pytest.mark.parametrize(
-    "test_table",
-    [{"is_temp": False, "param": {"schema": "custom_schema"}}],
+    "table_fixture",
+    [{"param": {"metadata": Metadata(schema="custom_schema")}}],
     indirect=True,
 )
 @pytest.mark.parametrize("file_type", ["csv"])
-def test_load_file_with_named_schema(sample_dag, sql_server, file_type, test_table):
+def test_load_file_with_named_schema(sample_dag, sql_server, file_type, table_fixture):
     database_name, sql_hook = sql_server
 
     with sample_dag:
         load_file(
             path=str(pathlib.Path(CWD.parent, f"data/sample.{file_type}")),
             file_conn_id="",
-            output_table=test_table,
+            output_table=table_fixture,
         )
     test_utils.run_dag(sample_dag)
-    df = sql_hook.get_pandas_df(f"SELECT * FROM {test_table.qualified_name()}")
+    db = create_database(table_fixture.conn_id)
+    df = sql_hook.get_pandas_df(
+        f"SELECT * FROM {db.get_table_qualified_name(table_fixture)}"
+    )
     assert len(df) == 3
     expected = pd.DataFrame(
         [
@@ -377,7 +386,7 @@ def test_load_file_with_named_schema(sample_dag, sql_server, file_type, test_tab
 @pytest.mark.parametrize(
     "sql_server", ["bigquery", "postgres", "snowflake"], indirect=True
 )
-def test_load_file_chunks(sample_dag, sql_server, test_table):
+def test_load_file_chunks(sample_dag, sql_server, table_fixture):
     file_type = "csv"
     database_name, sql_hook = sql_server
 
@@ -398,7 +407,7 @@ def test_load_file_chunks(sample_dag, sql_server, test_table):
             load_file(
                 path=str(pathlib.Path(CWD.parent, f"data/sample.{file_type}")),
                 file_conn_id="",
-                output_table=test_table,
+                output_table=table_fixture,
             )
         test_utils.run_dag(sample_dag)
 
@@ -410,44 +419,50 @@ def test_load_file_chunks(sample_dag, sql_server, test_table):
     "sql_server", [Database.POSTGRES.value, Database.BIGQUERY.value], indirect=True
 )
 def test_aql_nested_ndjson_file_with_default_sep_param(
-    sample_dag, sql_server, test_table
+    sample_dag, sql_server, table_fixture
 ):
     """Test the flattening of single level nested ndjson, with default separator '_'."""
     _, hook = sql_server
     with sample_dag:
         load_file(
             path=str(CWD) + "/../data/github_single_level_nested.ndjson",
-            output_table=test_table,
+            output_table=table_fixture,
         )
     test_utils.run_dag(sample_dag)
 
-    df = hook.get_pandas_df(f"SELECT * FROM {test_table.qualified_name()}")
+    db = create_database(table_fixture.conn_id)
+    df = hook.get_pandas_df(
+        f"SELECT * FROM {db.get_table_qualified_name(table_fixture)}"
+    )
     assert df.shape == (1, 36)
     assert "payload_size" in df.columns
 
 
 @pytest.mark.parametrize("sql_server", [Database.BIGQUERY.value], indirect=True)
 def test_aql_nested_ndjson_file_to_bigquery_explicit_sep_params(
-    sample_dag, sql_server, test_table
+    sample_dag, sql_server, table_fixture
 ):
     """Test the flattening of single level nested ndjson, with explicit separator '___'."""
     _, hook = sql_server
     with sample_dag:
         load_file(
             path=str(CWD) + "/../data/github_single_level_nested.ndjson",
-            output_table=test_table,
+            output_table=table_fixture,
             ndjson_normalize_sep="___",
         )
     test_utils.run_dag(sample_dag)
 
-    df = hook.get_pandas_df(f"SELECT * FROM {test_table.qualified_name()}")
+    db = create_database(table_fixture.conn_id)
+    df = hook.get_pandas_df(
+        f"SELECT * FROM {db.get_table_qualified_name(table_fixture)}"
+    )
     assert df.shape == (1, 36)
     assert "payload___size" in df.columns
 
 
 @pytest.mark.parametrize("sql_server", [Database.BIGQUERY.value], indirect=True)
 def test_aql_nested_ndjson_file_to_bigquery_explicit_illegal_sep_params(
-    sample_dag, sql_server, test_table
+    sample_dag, sql_server, table_fixture
 ):
     """Test the flattening of single level nested ndjson, with explicit separator illegal '.',
     since '.' is not acceptable in col names in bigquery.
@@ -456,19 +471,22 @@ def test_aql_nested_ndjson_file_to_bigquery_explicit_illegal_sep_params(
     with sample_dag:
         load_file(
             path=str(CWD) + "/../data/github_single_level_nested.ndjson",
-            output_table=test_table,
+            output_table=table_fixture,
             ndjson_normalize_sep=".",
         )
     test_utils.run_dag(sample_dag)
 
-    df = hook.get_pandas_df(f"SELECT * FROM {test_table.qualified_name()}")
+    db = create_database(table_fixture.conn_id)
+    df = hook.get_pandas_df(
+        f"SELECT * FROM {db.get_table_qualified_name(table_fixture)}"
+    )
     assert df.shape == (1, 36)
     assert "payload_size" in df.columns
 
 
 @pytest.mark.parametrize("sql_server", [Database.POSTGRES.value], indirect=True)
 def test_aql_multilevel_nested_ndjson_file_default_params(
-    sample_dag, sql_server, test_table, caplog
+    sample_dag, sql_server, table_fixture, caplog
 ):
     """
     Test the flattening of multilevel level nested ndjson, with default '_'.
@@ -478,7 +496,7 @@ def test_aql_multilevel_nested_ndjson_file_default_params(
         with sample_dag:
             load_file(
                 path=str(CWD) + "/../data/github_multi_level_nested.ndjson",
-                output_table=test_table,
+                output_table=table_fixture,
             )
         test_utils.run_dag(sample_dag)
     expected_error = "can't adapt type 'dict"
